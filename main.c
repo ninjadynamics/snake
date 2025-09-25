@@ -80,20 +80,24 @@ static const int8_t dir_y[5] = { 0, -1,  1,  0,  0};
 byte world[30][32];
 
 #pragma bss-name (push, "ZEROPAGE")
+Vec2 apple;
 Gamepad pad;
 Snake snake;
+uint8_t spd;
 uint8_t frame;
 uint8_t distance;
 uint8_t dir;
 uint8_t debug;
 uint8_t tx, ty;
-Vec2 apple;
+uint8_t apple_count;
 #pragma bss-name (pop)
 
 void create_new_apple(void) {
-  tx = 1 + rand8() % 30;
-  ty = 1 + rand8() % 28;
-  world[ty][tx] = APPLE;  
+  do { // Make sure it's an empty cell
+    tx = 1 + rand8() % 30;
+    ty = 1 + rand8() % 28;  
+  } while (world[ty][tx]);
+  world[ty][tx] = APPLE;
   apple.x = (tx * 8) - 0;
   apple.y = (ty * 8) - 1;  
 }
@@ -141,6 +145,7 @@ void main(void) {
   ppu_on_all();
   
   // Init game
+  spd = 8;
   frame = 0;
   distance = 1;
   
@@ -168,7 +173,7 @@ void main(void) {
     pad.trigger = pad_trigger(0);
     pad.poll = pad_poll(0);    
     
-    if (++frame % 8 == 0) {
+    if (++frame == spd) {
     
       snake.head.x += dir_x[snake.direction];
       if (snake.head.x > 31) snake.head.x = 0;
@@ -181,6 +186,7 @@ void main(void) {
       if (world[snake.head.y][snake.head.x] == APPLE) {
         create_new_apple();
         ++snake.size;
+        if (++apple_count % 4 == 0 && --spd == 0) spd = 1;
       }
       else if (world[snake.head.y][snake.head.x]) {
         pal_col(0, 0x06);
