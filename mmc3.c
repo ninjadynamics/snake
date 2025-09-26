@@ -51,6 +51,9 @@ void __fastcall__ mmc3_setup(void) {
 }
 
 void __fastcall__ mmc3_famitone_update_nmi(void) {
+  // Load background tileset
+  MMC3_CHR_1000(chr_bg);
+  
   // Play music and sfx
   famitone_update();
 
