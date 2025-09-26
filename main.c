@@ -226,7 +226,7 @@ void main(void) {
       if (snake.head.y > 29) snake.head.y = 0;
       else if (snake.head.y < 0) snake.head.y = 29;
       
-      // Catching an apple
+      // When catching an apple
       if (world[snake.head.y][snake.head.x] == APPLE) {
         create_new_apple();
         ++snake.size; // Grow snake
@@ -235,15 +235,15 @@ void main(void) {
         // Step calculation for smooth visuals
         step_fp = (8u << 8) / spd;
       }
-      // Bumping against itself
+      // When bumping against itself --> GAME OVER
       else if (world[snake.head.y][snake.head.x]) {
-        pal_col(0, 0x06);
-        ppu_wait_nmi();
-        while(pad_trigger(0) != PAD_START);
+        pal_col(0, 0x06); // Red screen of death
+        while(pad_trigger(0) != PAD_START) ppu_wait_nmi();
+        // - - - - - - - - - - - - - - - - - - - - - - - -
         ppu_off();
         vram_adr(NTADR_A(0, 0));
         vram_fill(0x00, 1024);
-        pal_col(0, 0x0f);
+        pal_col(0, 0x19);
         goto start;
       }
       
