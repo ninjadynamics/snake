@@ -32,19 +32,21 @@
 #include "mouse.h"
 #include "vram.h"
 
+#include <stdio.h>
 #include <stdint.h>
 
 #define INITIAL_X 16
 #define INITIAL_Y 14
 
 // Sprite layer
-#define APPLE 0x84
-#define LEAF  0x85
-#define GRASS 0x95
-#define HOLE  0x86
+#define GEM   0x95
+#define APPLE 0x83
+#define LEAF  0x84
+#define GRASS 0x94
+#define HOLE  0x85
 
 // Background layer
-#define BODY  0x29
+#define BODY  0xE9
 
 #define GRASS_DENSITY 32
 
@@ -56,6 +58,13 @@ typedef struct Vec2 {
   int8_t x;
   int8_t y;
 } Vec2;
+
+typedef struct Gem {
+  int8_t x;
+  int8_t y;
+  uint8_t palette;
+  uint16_t timer;
+} Gem;
 
 typedef struct Snake {
   Vec2 head;
@@ -69,6 +78,8 @@ typedef struct Gamepad {
   byte poll;
   byte trigger;
 } Gamepad;
+
+extern char demo_sounds[];
 
 const byte new_vram_buffer[] = {
   // Update Buffer Structure:
@@ -94,19 +105,23 @@ byte world[30][32];
 #pragma bss-name (pop)
 
 #pragma bss-name (push, "ZEROPAGE")
+Gem gem;
 Vec2 apple;
 Gamepad pad;
 Snake snake;
+byte obj;
 uint8_t spd;
 uint8_t frame;
 uint8_t distance;
 uint8_t dir;
-uint8_t debug, i;
+uint8_t tmp, i;
 uint8_t tx, ty, f;
 uint8_t apple_count;
 uint8_t step_px;
 uint16_t step_fp;
+uint32_t score;
 bool draw_hole;
+char text[6];
 #pragma bss-name (pop)
 
 Vec2 grass[GRASS_DENSITY];
@@ -118,31 +133,83 @@ const unsigned char pal[16]={
   0x19, 0x18, 0x29, 0x30
 };
 
-const unsigned char spr_head[][] = {
-  {
-    - 4, - 4, 0x80, 0,
-    + 4, - 4, 0x81, 0,
-    - 4, + 4, 0x90, 0,
-    + 4, + 4, 0x91, 0,
-    0x80
+const unsigned char spr_head[][][] = {
+  { // Up
+    {
+        0,- 1, 0x80, 0,
+        0,  7, 0x90, 0,
+      0x80
+    },
+    {
+        0,- 2, 0x80, 0,
+        0,  6, 0x90, 0,
+      0x80
+    },    
+  },  
+  { // Right
+    {
+      - 5,  1, 0x81, 0,
+        3,  1, 0x82, 0,
+      0x80
+    },
+    {
+      - 4,  1, 0x91, 0,
+        4,  1, 0x92, 0,
+      0x80
+    },    
   },
-  {
-    - 4, - 4, 0x82, 0,
-    + 4, - 4, 0x83, 0,
-    - 4, + 4, 0x92, 0,
-    + 4, + 4, 0x93, 0,
-    0x80
+  { // Down
+    {
+        0,- 4, 0x90, 0 | OAM_FLIP_V,
+        0,  4, 0x80, 0 | OAM_FLIP_V,
+      0x80
+    },
+    {
+        0,- 5, 0x90, 0 | OAM_FLIP_V,
+        0,  3, 0x80, 0 | OAM_FLIP_V,
+      0x80
+    },   
+  },  
+  { // Left
+    {
+      - 3,  1, 0x82, 0 | OAM_FLIP_H,
+        5,  1, 0x81, 0 | OAM_FLIP_H,
+      0x80
+    },
+    {
+      - 4,  1, 0x92, 0 | OAM_FLIP_H,
+        4,  1, 0x91, 0 | OAM_FLIP_H,
+      0x80
+    },    
   },
 };
 
-void create_new_apple(void) {
+void add_gem(void) {
   do { // Make sure it's an empty cell
     tx = 2 + rand8() % 28;
-    ty = 2 + rand8() % 26;
+    ty = 4 + rand8() % 24;
+  } while (world[ty][tx]);
+  world[ty][tx] = GEM;
+  gem.x = (tx * 8) - 0;
+  gem.y = (ty * 8) - 1;
+  gem.palette = rand8() % 3;
+  gem.timer = 60 * 5; // Seconds
+}
+
+void add_apple(void) {
+  do { // Make sure it's an empty cell
+    tx = 2 + rand8() % 28;
+    ty = 4 + rand8() % 24;
   } while (world[ty][tx]);
   world[ty][tx] = APPLE;
   apple.x = (tx * 8) - 0;
   apple.y = (ty * 8) - 1;  
+}
+
+void inc_score(uint8_t pts) {
+  score += pts;
+  if (score > 999999) score = 999999;
+  snprintf(text, 6, "%5lu", score);
 }
 
 void main(void) {
@@ -168,24 +235,32 @@ void main(void) {
   active_code_bank[0] = 0;
 
   // Initialize sound
+  sfx_bank = 21;
   FAMITONE_MUSIC_INIT(NULL);
-  FAMITONE_SFX_INIT(NULL);
+  FAMITONE_SFX_INIT(demo_sounds);
   
   // NMI Setup
   nmi_set_callback(mmc3_famitone_update_nmi);
   
   start:
   
+  // Init
+  gem.timer = 0;
   draw_hole = true;
   
+  // Add grass
   i = GRASS_DENSITY; while (i--) {
     grass[i].x = (2 + rand8() % 28) * 8; rand8();
-    grass[i].y = (2 + rand8() % 26) * 8; rand8();
+    grass[i].y = (3 + rand8() % 25) * 8; rand8();
   }
   
   // VRAM buffer
   memcpy(vram_buffer, new_vram_buffer, sizeof(new_vram_buffer));
   set_vram_update(vram_buffer);
+  
+  // Reset score
+  score = 0;
+  inc_score(0);
 
   // Enable rendering
   ppu_on_all();
@@ -196,7 +271,7 @@ void main(void) {
   distance = 1;
   step_fp = (8u << 8) / spd;
   
-  snake.size = 5;
+  snake.size = 8;
   snake.frame = 0;
   snake.head.x = INITIAL_X;
   snake.head.y = INITIAL_Y;
@@ -207,7 +282,7 @@ void main(void) {
   memfill(&world, 0x00, 32 * 30);
   world[INITIAL_Y][INITIAL_X] = snake.direction;
   
-  create_new_apple();  
+  add_apple();  
 
   // Main loop
   while (true) {
@@ -227,16 +302,30 @@ void main(void) {
       else if (snake.head.y < 0) snake.head.y = 29;
       
       // When catching an apple
-      if (world[snake.head.y][snake.head.x] == APPLE) {
-        create_new_apple();
+      obj = world[snake.head.y][snake.head.x];
+      if (obj == APPLE) {
+        FAMITONE_SFX_PLAY(4, 0);
+        add_apple();
+        inc_score(3 * snake.size);
         ++snake.size; // Grow snake
         // Increase speed every 4 apples
-        if (++apple_count % 4 == 0 && --spd == 0) spd = 1;
+        if (++apple_count == 4) {
+          add_gem();
+          apple_count = 0;
+          if (--spd == 1) spd = 2;
+        } 
         // Step calculation for smooth visuals
         step_fp = (8u << 8) / spd;
       }
+      else if (obj == GEM) {
+        FAMITONE_SFX_PLAY(2, 0);
+        tmp = (1 + gem.palette) * 10;
+        inc_score(tmp * snake.size);
+        gem.timer = 0;
+      }
       // When bumping against itself --> GAME OVER
       else if (world[snake.head.y][snake.head.x]) {
+        FAMITONE_SFX_PLAY(8, 0);
         pal_col(0, 0x06); // Red screen of death
         while(pad_trigger(0) != PAD_START) ppu_wait_nmi();
         // - - - - - - - - - - - - - - - - - - - - - - - -
@@ -328,7 +417,7 @@ void main(void) {
     
     // Mask corners
     if (snake.direction != dir) {
-      vram_buffer[2] = 0x1E;
+      vram_buffer[2] = 0xDE;
     }
     
     // Update world
@@ -351,13 +440,27 @@ void main(void) {
     
     // Clear sprites
     oam_clear();
+    
+    // Draw score
+    i = sizeof(text);
+    while (i--) oam_spr(
+      (25 * 8) + (i * 8),
+      ( 2 * 8), text[i], 0
+    );    
 
     // Draw head
-    oam_meta_spr(tx, ty, spr_head[f]);
+    dir = snake.direction - 1;
+    oam_meta_spr(tx, ty, spr_head[dir][f]);
         
     // Draw apple
     oam_spr(apple.x + 1, apple.y - 5, LEAF, 2);
     oam_spr(apple.x, apple.y, APPLE, 1);
+    
+    // Draw gem
+    if (gem.timer) {
+      --gem.timer;
+      oam_spr(gem.x, gem.y, GEM, gem.palette);
+    }
     
     // Draw hole
     if (draw_hole) oam_spr(
@@ -370,7 +473,7 @@ void main(void) {
     i = GRASS_DENSITY; while (i--) {
       oam_spr(grass[i].x, grass[i].y, GRASS, 3 | OAM_BEHIND);
     }
-        
+    
     // Wait for next frame
     ppu_wait_nmi();
     ++frame;
