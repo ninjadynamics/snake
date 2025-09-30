@@ -301,8 +301,10 @@ void main(void) {
       if (snake.head.y > 29) snake.head.y = 0;
       else if (snake.head.y < 0) snake.head.y = 29;
       
-      // When catching an apple
+      // Get object at head position, if any
       obj = world[snake.head.y][snake.head.x];
+      
+      // When catching an apple
       if (obj == APPLE) {
         FAMITONE_SFX_PLAY(4, 0);
         add_apple();
@@ -317,6 +319,7 @@ void main(void) {
         // Step calculation for smooth visuals
         step_fp = (8u << 8) / spd;
       }
+      // When catching a gem
       else if (obj == GEM) {
         FAMITONE_SFX_PLAY(2, 0);
         tmp = (1 + gem.palette) * 10;
@@ -336,6 +339,7 @@ void main(void) {
         goto start;
       }
       
+      // Write head direction into current world cell
       world[snake.head.y][snake.head.x] = snake.direction;
       
       // Draw head
