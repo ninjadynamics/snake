@@ -1,8 +1,9 @@
 Snake game based on the MMC3 Template
 =====
 
-[Game project](http://8bitworkshop.com/redir.html?platform=nes&githubURL=https%3A%2F%2Fgithub.com%2Fninjadynamics%2Fsnake&file=main.c).
-[MMC3 Template](http://8bitworkshop.com/redir.html?platform=nes&githubURL=https%3A%2F%2Fgithub.com%2Fninjadynamics%2FMMC3Template&file=main.c).
+[Game project](http://8bitworkshop.com/redir.html?platform=nes&githubURL=https%3A%2F%2Fgithub.com%2Fninjadynamics%2Fsnake&file=main.c)
+
+[MMC3 Template](http://8bitworkshop.com/redir.html?platform=nes&githubURL=https%3A%2F%2Fgithub.com%2Fninjadynamics%2FMMC3Template&file=main.c)
 
 #### Introduction
 
